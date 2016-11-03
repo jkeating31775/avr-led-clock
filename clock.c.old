@@ -1,0 +1,292 @@
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
+#include "clock.h"
+
+// set up interrupt vector to handle counting seconds 
+// from interrupt.h
+ISR(TIMER1_COMPA_vect) 
+{
+	seconds++;
+	if(seconds == 60)
+	{
+		seconds = 0;
+		minutes++;
+		if(minutes == 60)
+		{
+			minutes = 0;
+			hours++;
+			if(hours == 13) hours = 1;
+		}
+	}
+} 
+
+/*
+// interrupt to handle buttons
+// from interrupt.h
+ISR(TIMER2_OVF_vect)
+{
+}
+*/
+
+
+// interrupt to handle displaying stuff
+// from interrupt.h
+ISR(TIMER0_OVF_vect)
+{
+
+    // check if someone is pressing both buttons i.e. going into and out of set mode
+    if(bit_is_clear(PINB,1) && bit_is_clear(PINB,2)) {
+        both_pressed++;
+    }
+
+    // check if someone is moving the cursor in set mode
+    if(bit_is_clear(PINB,1) && !(bit_is_clear(PINB,2))) {
+        pin_b1_pressed++;
+    }
+
+    // debounce handler for moving set digit
+    if(pin_b1_pressed >= 500 && in_set_time) {
+        if(set_position > 5) {
+            set_position = 0;
+        }
+        else {
+            set_position++;
+        }
+    }
+
+    // debounce handler and check for mode switch
+    if(both_pressed >= 3000) {
+        if(!in_set_time && in_display_time) {
+            in_set_time = 1;
+            in_display_time = 0;
+            both_pressed = 0;
+        }
+        else if(in_set_time && !in_display_time) {
+            in_set_time = 0;
+            in_display_time = 1;
+            both_pressed = 0;
+            set_position = 0;
+        }
+    }
+
+    // determine what to display based on mode
+    if(in_set_time  && !in_display_time) {
+        display_set_time();
+    }
+    if(in_display_time && !in_set_time) {
+        display_time();
+    }
+}
+
+// set the alarm
+void display_set_time()
+{
+    switch(set_ctr % 6) {
+        case 0:
+            if(set_position == 0) {
+                if(set_ctr%500 > 250) {
+                    PORTC = DIGIT_ONE;
+                    PORTD = NUMBER_ZERO;
+                }
+                if(set_ctr%500  <= 250) { 
+                    PORTC=DIGIT_ONE;
+                    PORTD=NUMBER_BLANK;
+                }
+            }
+            else  {
+                PORTC = DIGIT_ONE;
+                PORTD = NUMBER_EIGHT;
+            }
+        break;
+
+        case 1:
+            if(set_position == 1) {
+                if(set_ctr%500 > 250) {
+                    PORTC = DIGIT_TWO;
+                    PORTD = NUMBER_ZERO;
+                }
+                if(set_ctr%500  <= 250) { 
+                    PORTC = DIGIT_TWO;
+                    PORTD = NUMBER_BLANK;
+                }
+            }
+            else  {
+                PORTC = DIGIT_TWO;
+                PORTD = NUMBER_EIGHT;
+            }
+        break;
+        
+        case 2:
+            if(set_position == 2) {
+                if(set_ctr%500 > 250) {
+                    PORTC = DIGIT_THREE;
+                    PORTD = NUMBER_ZERO;
+                }
+                if(set_ctr%500  <= 250) { 
+                    PORTC = DIGIT_TWO;
+                    PORTD = NUMBER_BLANK;
+                }
+            }
+            else  {
+                PORTC = DIGIT_THREE;
+                PORTD = NUMBER_EIGHT;
+            }
+        break;
+        case 3:
+            if(set_position == 3) {
+                if(set_ctr%500 > 250) {
+                    PORTC = DIGIT_FOUR;
+                    PORTD = NUMBER_ZERO;
+                }
+                if(set_ctr%500  <= 250) { 
+                    PORTC = DIGIT_FOUR;
+                    PORTD = NUMBER_BLANK;
+                }
+            }
+            else  {
+                PORTC = DIGIT_FOUR;
+                PORTD = NUMBER_EIGHT;
+            }
+        break;
+        case 4:
+            if(set_position == 4) {
+                if(set_ctr%500 > 250) {
+                    PORTC = DIGIT_FIVE;
+                    PORTD = NUMBER_ZERO;
+                }
+                if(set_ctr%500  <= 250) { 
+                    PORTC = DIGIT_FIVE;
+                    PORTD = NUMBER_BLANK;
+                }
+            }
+            else  {
+                PORTC = DIGIT_FIVE;
+                PORTD = NUMBER_EIGHT;
+            }
+        break;
+        case 5:
+            if(set_position == 5) {
+                if(set_ctr%500 > 250) {
+                    PORTC = DIGIT_SIX;
+                    PORTD = NUMBER_ZERO;
+                }
+                if(set_ctr%500  <= 250) { 
+                    PORTC = DIGIT_SIX;
+                    PORTD = NUMBER_BLANK;
+                }
+            }
+            else  {
+                PORTC = DIGIT_SIX;
+                PORTD = NUMBER_EIGHT;
+            }
+        break;
+    }
+    set_ctr++;
+    return;
+}
+
+
+
+// display all digits
+void display_time(void)
+{
+	switch(++display_ctr)
+	{
+		case 1: display_number(hours / 10, 1); break;
+		case 2:	display_number(hours % 10, 2); break;
+		case 3: display_number(minutes / 10, 3); break;
+		case 4: display_number(minutes % 10, 4); break;
+		case 5: display_number(seconds / 10, 5); break;
+		case 6: display_number(seconds % 10, 6); display_ctr=0; break;
+		default:	break;
+	}
+}
+
+// display single digit
+void display_number(uint8_t number, uint8_t digit)
+{
+	switch(digit)
+	{
+		case 1: PORTC = DIGIT_ONE; break;   // select digit 1
+		case 2: PORTC = DIGIT_TWO; break;	//Select Digit 2
+		case 3: PORTC = DIGIT_THREE; break;	//Select Digit 3
+		case 4: PORTC = DIGIT_FOUR; break;	//Select Digit 4
+		case 5: PORTC = DIGIT_FIVE; break;  // select DIgit 5
+		case 6: PORTC = DIGIT_SIX; break;	//Select Digit 6
+		default:	break;
+	}
+	switch(number)
+	{
+		case 0: PORTD = NUMBER_ZERO; break;
+		case 1: PORTD = NUMBER_ONE; break;
+		case 2: PORTD = NUMBER_TWO; break;
+		case 3: PORTD = NUMBER_THREE; break;
+		case 4: PORTD = NUMBER_FOUR; break;
+		case 5: PORTD = NUMBER_FIVE; break;
+		case 6: PORTD = NUMBER_SIX; break;
+		case 7: PORTD = NUMBER_SEVEN; break;
+		case 8: PORTD = NUMBER_EIGHT; break;
+		case 9: PORTD = NUMBER_NINE; break;
+		default:	break;
+	}	
+}
+
+void initialize_ports()
+{
+    // initialize ports
+    DDRC = DIG_ALL; //PC0-PC5 as outputs
+    DDRD = SEG_ALL; //PD0-PD6 as outputs
+                        
+    //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    //              Initialize Display Timer0
+    //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    TCCR0B |= (1 << CS01)+(1 << CS00); // Timer0 prescaler to clk/64 via CS01 + CS00 bits
+    TIMSK0 |= (1 << TOIE0); // Enable Timer0 (8-bit) overflow interrupt
+
+    /*
+    //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    //              Initialize Button Timer2
+    //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    TCCR2B |= (1 << CS01)+(1 << CS00); // Timer0 prescaler to clk/64 via CS01 + CS00 bits
+    TIMSK2 |= (1 << TOIE0); // Enable Timer0 (8-bit) overflow interrupt
+    */
+
+    //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    //              Initialize Time Timer1
+    //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    TCCR1B |= (1 << CS12)+(1 << CS10); // Timer1 prescaler to clk/1024 via CS10 + CS12 bits
+    TCCR1B |= (1 << WGM12); // configure for CTC mode
+    TIMSK1 |= (1 << OCIE1A); // CTC interrupt
+    OCR1A = 15625; // with prescaler 64, results in 1 Hz @ 1 MHz
+
+    // set up PINB1 for button pressing
+    DDRB &= (1 << PINB1); //Data Direction Register input PINB1
+    PORTB |= 1 << PINB1; //Set PINB1 to a high reading
+
+    // set up PINB2 for button pressing
+    DDRB &= (1 << PINB2); //Data Direction Register input PINB1
+    PORTB |= 1 << PINB2; //Set PINB1 to a high reading
+
+    return;
+}
+
+
+
+// mainloop
+int main(void) {    
+
+    initialize_ports();  // initialize port connections
+    sei(); //  enable global interrupts
+
+    hours = 12;
+    minutes = 00;
+    seconds = 00;
+    set_position = both_pressed = display_ctr = set_ctr = pin_b1_pressed = pin_b2_pressed = in_set_time = 0; 
+    in_display_time = 1;
+
+    while(1) {
+    } // loop forever
+
+    return 1;
+}
